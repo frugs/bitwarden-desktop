@@ -93,7 +93,7 @@ export class Main {
 
         this.windowMain = new WindowMain(this.storageService, true, undefined, undefined,
             arg => this.processDeepLink(arg), win => this.trayMain.setupWindowListeners(win));
-        this.messagingMain = new MessagingMain(this, this.storageService);
+        this.messagingMain = new MessagingMain(this, this.i18nService, this.storageService);
         this.updaterMain = new UpdaterMain(this.i18nService, this.windowMain, 'desktop', () => {
             this.menuMain.updateMenuItem.enabled = false;
         }, () => {
@@ -129,12 +129,19 @@ export class Main {
             await this.i18nService.init(locale != null ? locale : app.getLocale());
             this.messagingMain.init();
             this.menuMain.init();
-            await this.trayMain.init('Bitwarden', [{
-                label: this.i18nService.t('lockNow'),
-                enabled: false,
-                id: 'lockNow',
-                click: () => this.messagingService.send('lockVault'),
-            }]);
+            await this.trayMain.init('Bitwarden', [
+                {
+                    label: this.i18nService.t('lockNow'),
+                    enabled: false,
+                    id: 'lockNow',
+                    click: () => this.messagingService.send('lockVault'),
+                },
+                {
+                    label: this.i18nService.t('favorites'),
+                    enabled: false,
+                    id: 'favorites',
+                },
+            ]);
             if (await this.storageService.get<boolean>(ElectronConstants.enableStartToTrayKey)) {
                 this.trayMain.hideToTray();
             }

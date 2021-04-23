@@ -267,6 +267,14 @@ export class AppComponent implements OnInit {
                             await this.openPasswordGenerator();
                         }
                         break;
+                    case 'copyPasswordWithId':
+                        const cipher = await this.cipherService.get(message.id);
+                        if (cipher == null) {
+                            break;
+                        }
+                        const cv = await cipher.decrypt();
+                        this.platformUtilsService.copyToClipboard(message.copyUsername ? cv.login.username : cv.login.password);
+                        break;
                 }
             });
         });
@@ -330,9 +338,14 @@ export class AppComponent implements OnInit {
     }
 
     private async updateAppMenu() {
+        const isAuthenticated = await this.userService.isAuthenticated();
+        const isLocked = await this.vaultTimeoutService.isLocked();
+        const favoriteCiphers = isAuthenticated && !isLocked
+            ? await this.searchService.searchCiphers(null, cv => cv.favorite) : [];
         this.messagingService.send('updateAppMenu', {
-            isAuthenticated: await this.userService.isAuthenticated(),
-            isLocked: await this.vaultTimeoutService.isLocked(),
+            isAuthenticated: isAuthenticated,
+            isLocked: isLocked,
+            favorites: favoriteCiphers.map(cv => ({ id: cv.id, name: cv.name})),
         });
     }
 

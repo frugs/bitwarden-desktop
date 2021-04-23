@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, MenuItemConstructorOptions } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -7,13 +7,14 @@ import { Main } from '../main';
 import { ElectronConstants } from 'jslib/electron/electronConstants';
 
 import { StorageService } from 'jslib/abstractions/storage.service';
+import { I18nService } from 'jslib/abstractions';
 
 const SyncInterval = 5 * 60 * 1000; // 5 minutes
 
 export class MessagingMain {
     private syncTimeout: NodeJS.Timer;
 
-    constructor(private main: Main, private storageService: StorageService) { }
+    constructor(private main: Main, private i18nService: I18nService, private storageService: StorageService) { }
 
     init() {
         this.scheduleNextSync();
@@ -33,7 +34,7 @@ export class MessagingMain {
                 break;
             case 'updateAppMenu':
                 this.main.menuMain.updateApplicationMenuState(message.isAuthenticated, message.isLocked);
-                this.updateTrayMenu(message.isAuthenticated, message.isLocked);
+                this.updateTrayMenu(message.isAuthenticated, message.isLocked, message.favorites);
                 break;
             case 'minimizeOnCopy':
                 this.storageService.get<boolean>(ElectronConstants.minimizeOnCopyToClipboardKey).then(
@@ -89,14 +90,35 @@ export class MessagingMain {
         }, SyncInterval);
     }
 
-    private updateTrayMenu(isAuthenticated: boolean, isLocked: boolean) {
-        if (this.main.trayMain == null || this.main.trayMain.contextMenu == null) {
+    private updateTrayMenu(isAuthenticated: boolean, isLocked: boolean, favorites: any) {
+        if (this.main.trayMain == null || this.main.trayMain.contextMenuTemplate == null) {
             return;
         }
-        const lockNowTrayMenuItem = this.main.trayMain.contextMenu.getMenuItemById('lockNow');
+        const lockNowTrayMenuItem = this.main.trayMain.contextMenuTemplate.find(menuItem => menuItem.id == 'lockNow');
         if (lockNowTrayMenuItem != null) {
             lockNowTrayMenuItem.enabled = isAuthenticated && !isLocked;
         }
+        const favoritesTrayMenuItem = this.main.trayMain.contextMenuTemplate.find(menuItem => menuItem.id == 'favorites');
+        if (favoritesTrayMenuItem != null) {
+            favoritesTrayMenuItem.enabled = isAuthenticated && !isLocked;
+            const menuItemFactory = (favorite: any) => (
+                {
+                    label: favorite.name,
+                    submenu: [
+                        {
+                            label: this.i18nService.t('copyUsername'),
+                            click: () => this.main.messagingService.send('copyPasswordWithId', { id: favorite.id, copyUsername: true }),
+                        },
+                        {
+                            label: this.i18nService.t('copyPassword'),
+                            click: () => this.main.messagingService.send('copyPasswordWithId', { id: favorite.id, copyUsername: false }),
+                        }
+                    ]
+                }
+            );
+            favoritesTrayMenuItem.submenu = favoritesTrayMenuItem.enabled ? favorites.map(menuItemFactory) : null;
+        }
+        
         this.main.trayMain.updateContextMenu();
     }
 
